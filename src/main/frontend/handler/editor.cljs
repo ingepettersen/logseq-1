@@ -451,7 +451,7 @@
                    (not has-children?))]
     (outliner-tx/transact!
      {:outliner-op :insert-blocks}
-      (save-current-block! {:current-block current-block})
+     (save-current-block! {:current-block current-block})
      (outliner-core/insert-blocks! [new-block] current-block {:sibling? sibling?
                                                               :keep-uuid? keep-uuid?
                                                               :replace-empty-target? replace-empty-target?}))))
@@ -860,34 +860,34 @@
     (let [col' (group-by first col)]
       (outliner-tx/transact!
        {:outliner-op :save-block}
-        (doseq [[block-id items] col']
-          (let [block-id (if (string? block-id) (uuid block-id) block-id)
-                new-properties (zipmap (map second items)
-                                (map last items))]
-            (when-let [block (db/entity [:block/uuid block-id])]
-              (let [format (:block/format block)
-                    content (:block/content block)
-                    properties (:block/properties block)
-                    properties-text-values (:block/properties-text-values block)
-                    properties (-> (merge properties new-properties)
-                                   gp-util/remove-nils-non-nested)
-                    properties-text-values (-> (merge properties-text-values new-properties)
-                                               gp-util/remove-nils-non-nested)
-                    property-ks (->> (concat (:block/properties-order block)
-                                             (map second items))
-                                     (filter (set (keys properties)))
-                                     distinct
-                                     vec)
-                    content (property/remove-properties format content)
-                    kvs (for [key property-ks] [key (get properties key)])
-                    content (property/insert-properties format content kvs)
-                    content (property/remove-empty-properties content)
-                    block {:block/uuid block-id
-                           :block/properties properties
-                           :block/properties-order property-ks
-                           :block/properties-text-values properties-text-values
-                           :block/content content}]
-                (outliner-core/save-block! block)))))))
+       (doseq [[block-id items] col']
+         (let [block-id (if (string? block-id) (uuid block-id) block-id)
+               new-properties (zipmap (map second items)
+                               (map last items))]
+           (when-let [block (db/entity [:block/uuid block-id])]
+             (let [format (:block/format block)
+                   content (:block/content block)
+                   properties (:block/properties block)
+                   properties-text-values (:block/properties-text-values block)
+                   properties (-> (merge properties new-properties)
+                                  gp-util/remove-nils-non-nested)
+                   properties-text-values (-> (merge properties-text-values new-properties)
+                                              gp-util/remove-nils-non-nested)
+                   property-ks (->> (concat (:block/properties-order block)
+                                            (map second items))
+                                    (filter (set (keys properties)))
+                                    distinct
+                                    vec)
+                   content (property/remove-properties format content)
+                   kvs (for [key property-ks] [key (get properties key)])
+                   content (property/insert-properties format content kvs)
+                   content (property/remove-empty-properties content)
+                   block {:block/uuid block-id
+                          :block/properties properties
+                          :block/properties-order property-ks
+                          :block/properties-text-values properties-text-values
+                          :block/content content}]
+               (outliner-core/save-block! block)))))))
 
     (let [block-id (ffirst col)
           block-id (if (string? block-id) (uuid block-id) block-id)
@@ -2759,7 +2759,7 @@
       (outliner-tx/transact!
        {:outliner-op :move-blocks
         :real-outliner-op :indent-outdent}
-        (outliner-core/indent-outdent-blocks! [block] indent?)))
+       (outliner-core/indent-outdent-blocks! [block] indent?)))
     (state/set-editor-op! :nil)))
 
 (defn keydown-tab-handler
@@ -3073,8 +3073,8 @@
        [:div
         [:span.mb-1.5 (str "Block " format " copied!")]
         [:div [:code.whitespace.break-all (if (= format "embed")
-                                         (str "{{embed ((" block-id "))}}")
-                                         (block-ref/->block-ref block-id))]]]
+                                           (str "{{embed ((" block-id "))}}")
+                                           (block-ref/->block-ref block-id))]]]
        :success true
        ;; use uuid to make sure there is only one toast a time
        (str "copied-block-ref:" block-id)))))
@@ -3185,9 +3185,9 @@
           ;; if the move is to cross block boundary, select the whole block
          (or (and (= direction :up) (cursor/textarea-cursor-rect-first-row? cursor-rect))
              (and (= direction :down) (cursor/textarea-cursor-rect-last-row? cursor-rect)))
-          (select-block-up-down direction)
+         (select-block-up-down direction)
           ;; simulate text selection
-          (cursor/select-up-down input direction anchor cursor-rect)))
+         (cursor/select-up-down input direction anchor cursor-rect)))
       (select-block-up-down direction))))
 
 (defn open-selected-block!

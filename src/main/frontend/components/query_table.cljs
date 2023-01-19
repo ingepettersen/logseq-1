@@ -3,16 +3,18 @@
             [frontend.date :as date]
             [frontend.db :as db]
             [frontend.db.query-dsl :as query-dsl]
+            [frontend.format.block :as block]
             [frontend.handler.common :as common-handler]
             [frontend.handler.editor :as editor-handler]
+            [frontend.modules.outliner.tree :as tree]
+            [frontend.shui :refer [get-shui-component-version make-shui-context]]
             [frontend.state :as state]
             [frontend.util :as util]
             [frontend.util.clock :as clock]
             [frontend.util.property :as property]
-            [frontend.format.block :as block]
+            [logseq.shui.core :as shui]
             [medley.core :as medley]
-            [rum.core :as rum]
-            [frontend.modules.outliner.tree :as tree]))
+            [rum.core :as rum]))
 
 ;; Util fns
 ;; ========
@@ -42,9 +44,9 @@
 (defn- locale-compare
   "Use locale specific comparison for strings and general comparison for others."
   [x y]
-    (if (and (number? x) (number? y))
-      (< x y)
-      (.localeCompare (str x) (str y) (state/sub :preferred-language) #js {:numeric true})))
+  (if (and (number? x) (number? y))
+    (< x y)
+    (.localeCompare (str x) (str y) (state/sub :preferred-language) #js {:numeric true})))
 
 (defn- sort-result [result {:keys [sort-by-column sort-desc? sort-nlp-date?]}]
   (if (some? sort-by-column)
@@ -97,7 +99,7 @@
         keys (if page? (distinct (concat keys [:created-at :updated-at])) keys)]
     keys))
 
-(defn- get-columns [current-block result {:keys [page?]}]
+(defn get-columns [current-block result {:keys [page?]}]
   (let [query-properties (some-> (get-in current-block [:block/properties :query-properties] "")
                                  (common-handler/safe-read-string "Parsing query properties failed"))
         query-properties (if page? (remove #{:block} query-properties) query-properties)
@@ -150,7 +152,7 @@
 (rum/defcs result-table < rum/reactive
   (rum/local false ::select?)
   (rum/local false ::mouse-down?)
-  [state config current-block result {:keys [page?]} map-inline page-cp ->elem inline-text]
+  [state config current-block result {:keys [page?]} map-inline page-cp ->elem inline-text inline]
   (when current-block
     (let [result (tree/filter-top-level-blocks result)
           select? (get state ::select?)
@@ -165,52 +167,66 @@
           ;; Sort state needs to be in sync between final result and sortable title
           ;; as user needs to know if there result is sorted
           sort-state (get-sort-state current-block)
-          result' (sort-result result sort-state)]
-      [:div.overflow-x-auto {:on-mouse-down (fn [e] (.stopPropagation e))
-                             :style {:width "100%"}
-                             :class (when-not page? "query-table")}
-       [:table.table-auto
-        [:thead
-         [:tr.cursor
-          (for [column columns]
-            (let [title (if (and (= column :clock-time) (integer? clock-time-total))
-                             (util/format "clock-time(total: %s)" (clock/seconds->days:hours:minutes:seconds
-                                                                   clock-time-total))
-                             (name column))]
-              (sortable-title title column sort-state (:block/uuid current-block))))]]
-        [:tbody
-         (for [row result']
-           (let [format (:block/format row)]
+          result' (sort-result result sort-state)
+          table-version (get-shui-component-version :table config)
+          result-as-text (for [result-entry result'] 
+                           (for [column-name columns] 
+                             (case column-name 
+                               :block (or (get-in result-entry [:block/page :block/original-name])
+                                          (get-in result-entry [:block/content]))
+                               :page  (or (get-in result-entry [:block/original-name]) 
+                                          (get-in result-entry [:block/content])) 
+                                      (or (get-in result-entry [:block/properties column-name])
+                                          (get-in result-entry [:block/properties-text-value column-name])
+                                          (get-in result-entry [(keyword :block column-name)])))))]
+      (case table-version 
+        2 (shui/table-v2 {:data (conj [[columns]] result-as-text)} 
+                         (make-shui-context config inline))
+        1 [:div.overflow-x-auto {:on-mouse-down (fn [e] (.stopPropagation e))
+                                 :style {:width "100%"}
+                                 :class (when-not page? "query-table")}
+           [:table.table-auto
+            [:thead
              [:tr.cursor
               (for [column columns]
-                (let [value (build-column-value row
-                                                column
-                                                {:page? page?
-                                                 :->elem ->elem
-                                                 :map-inline map-inline
-                                                 :config config})]
-                  [:td.whitespace-nowrap {:on-mouse-down (fn []
-                                                           (reset! *mouse-down? true)
-                                                           (reset! select? false))
-                                          :on-mouse-move (fn [] (reset! select? true))
-                                          :on-mouse-up (fn []
-                                                         (when (and @*mouse-down? (not @select?))
-                                                           (state/sidebar-add-block!
-                                                            (state/get-current-repo)
-                                                            (:db/id row)
-                                                            :block-ref)
-                                                           (reset! *mouse-down? false)))}
-                   (when value
-                     (if (= :element (first value))
-                       (second value)
-                       (let [value (second value)]
-                         (if (coll? value)
-                           (let [vals (for [row value]
-                                        (page-cp {} {:block/name row}))]
-                             (interpose [:span ", "] vals))
-                           (cond
-                             (boolean? value) (str value)
-                             (string? value) (if-let [page (db/entity [:block/name (util/page-name-sanity-lc value)])]
-                                               (page-cp {} page)
-                                               (inline-text format value))
-                             :else value)))))]))]))]]])))
+                (let [title (if (and (= column :clock-time) (integer? clock-time-total))
+                                (util/format "clock-time(total: %s)" (clock/seconds->days:hours:minutes:seconds
+                                                                      clock-time-total))
+                                (name column))]
+                  (sortable-title title column sort-state (:block/uuid current-block))))]]
+            [:tbody
+             (for [row result']
+               (let [format (:block/format row)]
+                 [:tr.cursor
+                  (for [column columns]
+                    (let [value (build-column-value row
+                                                    column
+                                                    {:page? page?
+                                                     :->elem ->elem
+                                                     :map-inline map-inline
+                                                     :config config})]
+                      [:td.whitespace-nowrap {:on-mouse-down (fn []
+                                                               (reset! *mouse-down? true)
+                                                               (reset! select? false))
+                                              :on-mouse-move (fn [] (reset! select? true))
+                                              :on-mouse-up (fn []
+                                                             (when (and @*mouse-down? (not @select?))
+                                                               (state/sidebar-add-block!
+                                                                (state/get-current-repo)
+                                                                (:db/id row)
+                                                                :block-ref)
+                                                               (reset! *mouse-down? false)))}
+                       (when value
+                         (if (= :element (first value))
+                           (second value)
+                           (let [value (second value)]
+                             (if (coll? value)
+                               (let [vals (for [row value]
+                                            (page-cp {} {:block/name row}))]
+                                 (interpose [:span ", "] vals))
+                               (cond
+                                 (boolean? value) (str value)
+                                 (string? value) (if-let [page (db/entity [:block/name (util/page-name-sanity-lc value)])]
+                                                   (page-cp {} page)
+                                                   (inline-text format value))
+                                 :else value)))))]))]))]]]))))

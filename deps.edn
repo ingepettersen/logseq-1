@@ -29,8 +29,9 @@
   org.clojars.mmb90/cljs-cache          {:mvn/version "0.1.4"}
   logseq/common                         {:local/root "deps/common"}
   logseq/graph-parser                   {:local/root "deps/graph-parser"}
-  metosin/malli                         {:mvn/version "0.10.0"}
-  fipp/fipp                             {:mvn/version "0.6.26"}}
+  fipp/fipp                             {:mvn/version "0.6.26"}
+  logseq/shui                           {:local/root "deps/shui"}
+  metosin/malli                         {:mvn/version "0.10.0"}}
 
  :aliases {:cljs {:extra-paths ["src/dev-cljs/" "src/test/" "src/electron/"]
                   :extra-deps  {org.clojure/clojurescript        {:mvn/version "1.11.54"}

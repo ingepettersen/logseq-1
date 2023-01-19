@@ -55,6 +55,7 @@
             [frontend.modules.outliner.tree :as tree]
             [frontend.search :as search]
             [frontend.security :as security]
+            [frontend.shui :refer [get-shui-component-version make-shui-context]]
             [frontend.state :as state]
             [frontend.template :as template]
             [frontend.ui :as ui]
@@ -76,6 +77,7 @@
             [logseq.graph-parser.util.block-ref :as block-ref]
             [logseq.graph-parser.util.page-ref :as page-ref]
             [logseq.graph-parser.whiteboard :as gp-whiteboard]
+            [logseq.shui.core :as shui]
             [medley.core :as medley]
             [promesa.core :as p]
             [reitit.frontend.easy :as rfe]
@@ -303,8 +305,8 @@
                          (js/setTimeout #(reset! *resizing-image? false) 200)))
           :onClick (fn [e]
                      (when @*resizing-image? (util/stop e)))}
-          (and (:width metadata) (not (util/mobile?)))
-          (assoc :style {:width (:width metadata)}))
+         (and (:width metadata) (not (util/mobile?)))
+         (assoc :style {:width (:width metadata)}))
         {})
       [:div.asset-container {:key "resize-asset-container"}
        [:img.rounded-sm.relative
@@ -935,9 +937,9 @@
              inner)])
         [:span.warning.mr-1 {:title "Block ref invalid"}
          (block-ref/->block-ref id)]))
-  [:span.warning.mr-1 {:title "Block ref invalid"}
-    (block-ref/->block-ref id)]
-))
+   [:span.warning.mr-1 {:title "Block ref invalid"}
+     (block-ref/->block-ref id)]))
+
 
 (defn inline-text
   ([format v]
@@ -1116,8 +1118,8 @@
         {:href      (str "file://" path)
          :data-href path
          :target    "_blank"}
-         title
-         (assoc :title title))
+        title
+        (assoc :title title))
        (map-inline config label)))
 
     :else
@@ -1210,8 +1212,8 @@
            (cond->
             {:href (ar-url->http-url href)
              :target "_blank"}
-             title
-             (assoc :title title))
+            title
+            (assoc :title title))
            (map-inline config label))
 
           :else
@@ -1220,8 +1222,8 @@
            (cond->
             {:href href
              :target "_blank"}
-             title
-             (assoc :title title))
+            title
+            (assoc :title title))
            (map-inline config label)))))))
 
 ;;;; Macro component render functions
@@ -2232,7 +2234,7 @@
              (and (not block-content?)
                   (seq (:block/children block))
                   (= move-to :nested)))
-          (dnd-separator move-to block-content?))))))
+         (dnd-separator move-to block-content?))))))
 
 (defn clock-summary-cp
   [block body]
@@ -2274,19 +2276,19 @@
         content (if (string? content) (string/trim content) "")
         mouse-down-key (if (util/ios?)
                          :on-click
-                         :on-mouse-down ; TODO: it seems that Safari doesn't work well with on-mouse-down
-                         )
+                         :on-mouse-down) ; TODO: it seems that Safari doesn't work well with on-mouse-down
+                         
         attrs (cond->
                {:blockid       (str uuid)
                 :data-type (name block-type)
                 :style {:width "100%" :pointer-events (when stop-events? "none")}}
 
-                (not (string/blank? (:hl-color properties)))
-                (assoc :data-hl-color (:hl-color properties))
+               (not (string/blank? (:hl-color properties)))
+               (assoc :data-hl-color (:hl-color properties))
 
-                (not block-ref?)
-                (assoc mouse-down-key (fn [e]
-                                        (block-content-on-mouse-down e block block-id content edit-input-id))))]
+               (not block-ref?)
+               (assoc mouse-down-key (fn [e]
+                                       (block-content-on-mouse-down e block block-id content edit-input-id))))]
     [:div.block-content.inline
      (cond-> {:id (str "block-content-" uuid)
               :on-mouse-up (fn [e]
@@ -2964,8 +2966,8 @@
          :li
          (cond->
           {:checked checked?}
-           number
-           (assoc :value number))
+          number
+          (assoc :value number))
          (vec-cat
           [(->elem
             :p
@@ -2983,52 +2985,55 @@
 
 (defn table
   [config {:keys [header groups col_groups]}]
-  (let [tr (fn [elm cols]
-             (->elem
-              :tr
-              (mapv (fn [col]
-                      (->elem
-                       elm
-                       {:scope "col"
-                        :class "org-left"}
-                       (map-inline config col)))
-                    cols)))
-        tb-col-groups (try
-                        (mapv (fn [number]
-                                (let [col-elem [:col {:class "org-left"}]]
-                                  (->elem
-                                   :colgroup
-                                   (repeat number col-elem))))
-                              col_groups)
-                        (catch :default _e
-                          []))
-        head (when header
-               [:thead (tr :th header)])
-        groups (mapv (fn [group]
-                       (->elem
-                        :tbody
-                        (mapv #(tr :td %) group)))
-                     groups)]
-    [:div.table-wrapper
-     (->elem
-      :table
-      {:class "table-auto"
-       :border 2
-       :cell-spacing 0
-       :cell-padding 6
-       :rules "groups"
-       :frame "hsides"}
-      (vec-cat
-       tb-col-groups
-       (cons head groups)))]))
+  (case (get-shui-component-version :table config) 
+    2 (shui/table-v2 {:data (concat [[header]] groups)} 
+                     (make-shui-context config inline))
+    1 (let [tr (fn [elm cols]
+                 (->elem
+                  :tr
+                  (mapv (fn [col]
+                          (->elem
+                           elm
+                           {:scope "col"
+                            :class "org-left"}
+                           (map-inline config col)))
+                        cols)))
+            tb-col-groups (try
+                            (mapv (fn [number]
+                                    (let [col-elem [:col {:class "org-left"}]]
+                                      (->elem
+                                       :colgroup
+                                       (repeat number col-elem))))
+                                  col_groups)
+                            (catch :default _e
+                              []))
+            head (when header
+                   [:thead (tr :th header)])
+            groups (mapv (fn [group]
+                           (->elem
+                            :tbody
+                            (mapv #(tr :td %) group)))
+                         groups)]
+        [:div.table-wrapper
+         (->elem
+          :table
+          {:class "table-auto"
+           :border 2
+           :cell-spacing 0
+           :cell-padding 6
+           :rules "groups"
+           :frame "hsides"}
+          (vec-cat
+           tb-col-groups
+           (cons head groups)))])))
 
 (defn logbook-cp
   [log]
   (let [clocks (filter #(string/starts-with? % "CLOCK:") log)
-        clocks (reverse (sort-by str clocks))
+        clocks (reverse (sort-by str clocks))]
         ;; TODO: display states change log
         ; states (filter #(not (string/starts-with? % "CLOCK:")) log)
-        ]
+        
     (when (seq clocks)
       (let [tr (fn [elm cols] (->elem :tr
                                       (mapv (fn [col] (->elem elm col)) cols)))
@@ -3174,10 +3179,10 @@
            (util/hiccup-keywordize result))
 
          page-list?
-         (query-table/result-table config current-block result {:page? true} map-inline page-cp ->elem inline-text)
+         (query-table/result-table config current-block result {:page? true} map-inline page-cp ->elem inline-text inline)
 
          table?
-         (query-table/result-table config current-block result {:page? false} map-inline page-cp ->elem inline-text)
+         (query-table/result-table config current-block result {:page? false} map-inline page-cp ->elem inline-text inline)
 
          (and (seq result) (or only-blocks? blocks-grouped-by-page?))
          (->hiccup result (cond-> (assoc config
