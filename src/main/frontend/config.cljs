@@ -25,7 +25,8 @@
 (goog-define TEST false)
 (def test? TEST)
 
-(goog-define ENABLE-FILE-SYNC-PRODUCTION false)
+; (goog-define ENABLE-FILE-SYNC-PRODUCTION false)
+(def ENABLE-FILE-SYNC-PRODUCTION false)
 
 (if ENABLE-FILE-SYNC-PRODUCTION
   (do (def FILE-SYNC-PROD? true)
@@ -467,7 +468,7 @@
 (defn get-current-repo-assets-root
   []
   (when-let [repo-dir (and (local-db? (state/get-current-repo))
-                            (get-repo-dir (state/get-current-repo)))]
+                           (get-repo-dir (state/get-current-repo)))]
     (path/path-join repo-dir "assets")))
 
 (defn get-custom-js-path
